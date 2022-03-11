@@ -238,7 +238,7 @@ def train():
     warmup_steps = args.warmup_steps
     warmup_start_lr = 1e-5
 
-    if dist.get_rank()==0: 
+    if True: 
         print('max_iter: ', max_iter)
         print('save_iter_sep: ', save_iter_sep)
         print('warmup_steps: ', warmup_steps)
@@ -254,7 +254,7 @@ def train():
             power = power)
     
     ## train loop
-    msg_iter = 50
+    msg_iter = 3
     loss_avg = []
     loss_boundery_bce = []
     loss_boundery_dice = []
@@ -326,8 +326,8 @@ def train():
 
         loss_avg.append(loss.item())
 
-        loss_boundery_bce.append(boundery_bce_loss.item())
-        loss_boundery_dice.append(boundery_dice_loss.item())
+        loss_boundery_bce.append(boundery_bce_loss)
+        loss_boundery_dice.append(boundery_dice_loss)
 
         ## print training log message
         if (it+1)%msg_iter==0:
