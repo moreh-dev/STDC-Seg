@@ -27,7 +27,7 @@ def get_one_hot(label, N):
 def get_boundary(gtmasks):
 
     laplacian_kernel = torch.tensor(
-        [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+        [-1., -1., -1., -1., 8., -1., -1., -1., -1.],
         dtype=torch.float32, device=gtmasks.device).reshape(1, 1, 3, 3).requires_grad_(False)
     # boundary_logits = boundary_logits.unsqueeze(1)
     boundary_targets = F.conv2d(gtmasks.unsqueeze(1), laplacian_kernel, padding=1)
@@ -41,28 +41,47 @@ class DetailAggregateLoss(nn.Module):
     def __init__(self, *args, **kwargs):
         super(DetailAggregateLoss, self).__init__()
         
+        # self.laplacian_kernel = torch.tensor(
+        #     [-1, -1, -1, -1, 8, -1, -1, -1, -1],
+        #     dtype=torch.float32).reshape(1, 1, 3, 3).requires_grad_(False).type(torch.cuda.FloatTensor)
+
         self.laplacian_kernel = torch.tensor(
             [-1, -1, -1, -1, 8, -1, -1, -1, -1],
-            dtype=torch.float32).reshape(1, 1, 3, 3).requires_grad_(False).type(torch.cuda.FloatTensor)
+            dtype=torch.float32).reshape(1, 1, 3, 3).requires_grad_(False)
+        self.laplacian_kernel = self.laplacian_kernel.cuda()
         
+        # self.fuse_kernel = torch.nn.Parameter(torch.tensor([[6./10], [3./10], [1./10]],
+        #     dtype=torch.float32).reshape(1, 3, 1, 1).type(torch.cuda.FloatTensor))
         self.fuse_kernel = torch.nn.Parameter(torch.tensor([[6./10], [3./10], [1./10]],
-            dtype=torch.float32).reshape(1, 3, 1, 1).type(torch.cuda.FloatTensor))
+            dtype=torch.float32).reshape(1, 3, 1, 1)).cuda()
 
     def forward(self, boundary_logits, gtmasks):
 
         # boundary_logits = boundary_logits.unsqueeze(1)
-        boundary_targets = F.conv2d(gtmasks.unsqueeze(1).type(torch.cuda.FloatTensor), self.laplacian_kernel, padding=1)
+        gtmasks = gtmasks.unsqueeze(1).type(torch.float32)
+        boundary_targets = F.conv2d(gtmasks, self.laplacian_kernel, padding=1)
+        # boundary_targets = F.conv2d(gtmasks.unsqueeze(1).type(torch.cuda.FloatTensor), self.laplacian_kernel, padding=1)
+        
         boundary_targets = boundary_targets.clamp(min=0)
         boundary_targets[boundary_targets > 0.1] = 1
         boundary_targets[boundary_targets <= 0.1] = 0
 
-        boundary_targets_x2 = F.conv2d(gtmasks.unsqueeze(1).type(torch.cuda.FloatTensor), self.laplacian_kernel, stride=2, padding=1)
+        # boundary_targets_x2 = F.conv2d(gtmasks.unsqueeze(1).type(torch.cuda.FloatTensor), self.laplacian_kernel, stride=2, padding=1)
+        # boundary_targets_x2 = boundary_targets_x2.clamp(min=0)
+        
+        # boundary_targets_x4 = F.conv2d(gtmasks.unsqueeze(1).type(torch.cuda.FloatTensor), self.laplacian_kernel, stride=4, padding=1)
+        # boundary_targets_x4 = boundary_targets_x4.clamp(min=0)
+
+        # boundary_targets_x8 = F.conv2d(gtmasks.unsqueeze(1).type(torch.cuda.FloatTensor), self.laplacian_kernel, stride=8, padding=1)
+        # boundary_targets_x8 = boundary_targets_x8.clamp(min=0)
+
+        boundary_targets_x2 = F.conv2d(gtmasks, self.laplacian_kernel, stride=2, padding=1)
         boundary_targets_x2 = boundary_targets_x2.clamp(min=0)
         
-        boundary_targets_x4 = F.conv2d(gtmasks.unsqueeze(1).type(torch.cuda.FloatTensor), self.laplacian_kernel, stride=4, padding=1)
+        boundary_targets_x4 = F.conv2d(gtmasks, self.laplacian_kernel, stride=4, padding=1)
         boundary_targets_x4 = boundary_targets_x4.clamp(min=0)
 
-        boundary_targets_x8 = F.conv2d(gtmasks.unsqueeze(1).type(torch.cuda.FloatTensor), self.laplacian_kernel, stride=8, padding=1)
+        boundary_targets_x8 = F.conv2d(gtmasks, self.laplacian_kernel, stride=8, padding=1)
         boundary_targets_x8 = boundary_targets_x8.clamp(min=0)
     
         boundary_targets_x8_up = F.interpolate(boundary_targets_x8, boundary_targets.shape[2:], mode='nearest')
